@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>E4CC - Ruleta de Premios</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow-x: hidden;
+    position: relative;
+    background: #6a0080;
+  }
+
+  /* ── FESTIVE BG ── */
+  .fest-bg {
+    position: fixed; inset: 0; z-index: 0; overflow: hidden;
+    background: radial-gradient(ellipse at 60% 0%, #ff3cac 0%, #9b00d3 35%, #5a0080 65%, #3a0060 100%);
+  }
+
+  /* Rays */
+  .rays {
+    position: absolute; inset: 0;
+    background: conic-gradient(from 270deg at 75% 10%,
+      transparent 0deg, rgba(255,255,255,0.07) 4deg, transparent 8deg,
+      rgba(255,255,255,0.05) 14deg, transparent 18deg,
+      rgba(255,255,255,0.08) 24deg, transparent 28deg,
+      rgba(255,255,255,0.04) 34deg, transparent 38deg,
+      rgba(255,255,255,0.07) 44deg, transparent 48deg,
+      rgba(255,255,255,0.05) 54deg, transparent 58deg
+    );
+  }
+
+  /* Bokeh */
+  .bk { position:absolute; border-radius:50%; filter:blur(30px); pointer-events:none; }
+  .bk1 { width:220px;height:220px;top:-60px;right:-40px;background:rgba(255,100,200,0.45); animation:bkf 7s ease-in-out infinite alternate; }
+  .bk2 { width:160px;height:160px;top:10%;left:-30px;background:rgba(200,50,255,0.35); animation:bkf 9s 1s ease-in-out infinite alternate; }
+  .bk3 { width:100px;height:100px;top:40%;right:5%;background:rgba(255,200,50,0.2); animation:bkf 5s 2s ease-in-out infinite alternate; }
+  .bk4 { width:180px;height:180px;bottom:5%;left:10%;background:rgba(255,50,180,0.3); animation:bkf 8s 0.5s ease-in-out infinite alternate; }
+  .bk5 { width:120px;height:120px;bottom:15%;right:5%;background:rgba(180,50,255,0.3); animation:bkf 6s 3s ease-in-out infinite alternate; }
+  @keyframes bkf { from{transform:scale(1)} to{transform:scale(1.4) translate(8px,12px)} }
+
+  /* Static confetti/serpentinas decoration */
+  .deco-confetti { position:absolute; pointer-events:none; }
+
+  /* ── MAIN ── */
+  .main {
+    position: relative; z-index: 10;
+    width: 100%; max-width: 420px;
+    padding: 24px 16px 40px;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    min-height: 100vh;
+    gap: 18px;
+  }
+
+  /* ── SCREENS ── */
+  .screen { width:100%; display:none; flex-direction:column; align-items:center; gap:18px; }
+  .screen.active { display:flex; }
+
+  /* ── CARD ── */
+  .card {
+    background: white;
+    border-radius: 24px;
+    padding: 30px 24px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 12px 50px rgba(0,0,0,0.4), 0 0 0 3px rgba(255,255,255,0.2);
+  }
+  .card h2 { color: #6a0080; font-size: 22px; margin-bottom: 8px; }
+  .card p  { color: #666; font-size: 14px; line-height: 1.6; margin-bottom: 18px; }
+  .card input {
+    width: 100%; padding: 14px 16px;
+    border: 2px solid #ddd; border-radius: 12px;
+    font-size: 15px; outline: none;
+    transition: border 0.2s; margin-bottom: 12px;
+  }
+  .card input:focus { border-color: #9b00d3; }
+
+  .btn-main {
+    width: 100%; padding: 16px;
+    background: linear-gradient(135deg, #ff3cac, #9b00d3);
+    color: white; border: none; border-radius: 14px;
+    font-size: 17px; font-weight: 800; cursor: pointer;
+    box-shadow: 0 4px 20px rgba(155,0,211,0.5);
+    text-transform: uppercase; letter-spacing: 1px;
+    transition: transform 0.15s;
+  }
+  .btn-main:active { transform: scale(0.97); }
+  .error-msg { color: #cc0000; font-size: 13px; margin-top:-8px; margin-bottom:4px; }
+
+  /* ── SPIN TITLE ── */
+  .spin-title { text-align:center; color:white; }
+  .spin-title h1 {
+    font-size: 28px; font-weight: 900;
+    color: #FFD700;
+    text-shadow: 0 0 20px rgba(255,200,0,0.8), 0 2px 8px rgba(0,0,0,0.4);
+  }
+  .spin-title p { font-size: 13px; color: rgba(255,255,255,0.9); margin-top:4px; }
+  .attempt-badge {
+    display: inline-block; margin-top:6px;
+    background: linear-gradient(135deg,#ff3cac,#9b00d3);
+    color: white; padding: 4px 16px; border-radius: 20px;
+    font-size: 12px; font-weight: 700;
+    box-shadow: 0 2px 10px rgba(155,0,211,0.5);
+  }
+
+  /* ── WHEEL ── */
+  .wheel-wrapper {
+    position: relative; width: 300px; height: 300px;
+    filter: drop-shadow(0 0 25px rgba(255,60,172,0.6));
+  }
+  canvas#wheel { border-radius:50%; display:block; }
+  .pointer {
+    position:absolute; top:-18px; left:50%; transform:translateX(-50%);
+    width:0; height:0;
+    border-left:14px solid transparent;
+    border-right:14px solid transparent;
+    border-top:36px solid #FFD700;
+    filter: drop-shadow(0 2px 6px rgba(0,0,0,0.5));
+    z-index:10;
+  }
+  .pointer::after {
+    content:'';position:absolute;top:-40px;left:-8px;
+    width:16px;height:16px;background:#ff3cac;
+    border-radius:50%;border:3px solid #FFD700;
+  }
+  .center-hub {
+    position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    width:50px;height:50px;
+    background:radial-gradient(circle,#fff 0%,#FFD700 55%,#ff3cac 100%);
+    border-radius:50%;border:4px solid white;
+    box-shadow:0 0 20px rgba(255,200,0,0.8);
+    z-index:5;display:flex;align-items:center;justify-content:center;font-size:22px;
+  }
+
+  /* ── SPIN BTN ── */
+  .btn-spin {
+    width:100%;max-width:300px;padding:18px;
+    background:linear-gradient(135deg,#FFD700,#FFA500);
+    color:#6a0080;border:none;border-radius:16px;
+    font-size:20px;font-weight:900;cursor:pointer;
+    box-shadow:0 6px 24px rgba(255,180,0,0.5);
+    text-transform:uppercase;letter-spacing:2px;
+    transition:transform 0.15s;
+  }
+  .btn-spin:active{transform:scale(0.96);}
+  .btn-spin:disabled{opacity:0.5;cursor:not-allowed;transform:none;}
+
+  /* ── MODAL ── */
+  .modal-overlay {
+    display:none;position:fixed;inset:0;
+    background:rgba(0,0,0,0.75);z-index:200;
+    align-items:center;justify-content:center;padding:20px;
+  }
+  .modal-overlay.show{display:flex;}
+  .modal {
+    background:white;border-radius:24px;
+    padding:32px 24px;max-width:360px;width:100%;
+    text-align:center;
+    animation:popIn 0.4s cubic-bezier(0.34,1.56,0.64,1);
+    box-shadow:0 0 0 3px rgba(255,60,172,0.4),0 20px 60px rgba(0,0,0,0.5);
+  }
+  @keyframes popIn{from{transform:scale(0.5);opacity:0}to{transform:scale(1);opacity:1}}
+  .modal-emoji{font-size:60px;margin-bottom:12px;}
+  .modal-title{font-size:22px;font-weight:900;color:#6a0080;margin-bottom:10px;}
+  .modal-msg{font-size:15px;color:#555;line-height:1.6;margin-bottom:20px;}
+  .modal-msg strong{color:#ff3cac;}
+  .btn-claim {
+    display:block;width:100%;padding:16px;
+    background:linear-gradient(135deg,#00a832,#00cc3e);
+    color:white;border:none;border-radius:14px;
+    font-size:17px;font-weight:800;cursor:pointer;text-decoration:none;
+    box-shadow:0 4px 16px rgba(0,180,0,0.4);
+    text-transform:uppercase;letter-spacing:1px;
+    margin-bottom:10px;transition:transform 0.15s;
+  }
+  .btn-claim:active{transform:scale(0.97);}
+  .confetti-note{font-size:12px;color:#aaa;margin-top:6px;}
+
+  /* ── BLOCKED ── */
+  .blocked-card {
+    background:white;border-radius:20px;
+    padding:32px 24px;text-align:center;
+    box-shadow:0 8px 32px rgba(0,0,0,0.4);
+    width:100%;
+  }
+  .blocked-card .emoji{font-size:50px;margin-bottom:12px;}
+  .blocked-card h2{color:#6a0080;font-size:20px;margin-bottom:8px;}
+  .blocked-card p{color:#666;font-size:14px;line-height:1.5;}
+
+  /* ── CONFETTI ANIMATION ── */
+  .confetti-piece {
+    position:fixed;top:-10px;opacity:0;
+    animation:confettiFall linear forwards;z-index:300;border-radius:2px;
+  }
+  @keyframes confettiFall{
+    0%{transform:translateY(0) rotate(0deg);opacity:1;}
+    100%{transform:translateY(110vh) rotate(720deg);opacity:0;}
+  }
+
+  /* ── DECO SERPENTINAS (SVG inline) ── */
+  .serp {
+    position:absolute;pointer-events:none;opacity:0.7;
+  }
+
+  /* ── ADMIN ── */
+  .admin-btn {
+    position:fixed;bottom:6px;right:10px;
+    background:none;border:none;
+    color:rgba(255,255,255,0.08);font-size:10px;
+    cursor:pointer;z-index:50;padding:6px;
+  }
+  .admin-panel {
+    display:none;position:fixed;bottom:30px;right:10px;left:10px;
+    background:rgba(30,0,50,0.97);border:1px solid rgba(255,60,172,0.3);
+    border-radius:16px;padding:20px;z-index:50;color:white;
+    box-shadow:0 8px 32px rgba(0,0,0,0.6);
+  }
+  .admin-panel h3{color:#FFD700;margin-bottom:12px;font-size:14px;}
+  .admin-panel input,.admin-panel textarea {
+    width:100%;padding:10px 12px;border-radius:8px;border:1px solid #554;
+    background:#1a0030;color:white;font-size:13px;margin-bottom:8px;
+  }
+  .admin-panel label{font-size:12px;color:#aaa;margin-bottom:4px;display:block;}
+  .admin-save{background:#ff3cac;color:white;border:none;padding:10px 18px;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;margin-top:4px;}
+  .admin-reset{background:#cc0000;color:white;border:none;padding:10px 18px;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;margin-top:4px;margin-left:8px;}
+  .admin-note{font-size:11px;color:#777;margin-top:8px;}
+</style>
+</head>
+<body>
+
+<!-- FESTIVE BG -->
+<div class="fest-bg">
+  <div class="rays"></div>
+  <div class="bk bk1"></div>
+  <div class="bk bk2"></div>
+  <div class="bk bk3"></div>
+  <div class="bk bk4"></div>
+  <div class="bk bk5"></div>
+
+  <!-- Serpentinas SVG decorativas -->
+  <svg class="serp" style="top:-10px;right:-10px;width:220px;height:320px;" viewBox="0 0 220 320">
+    <path d="M200,0 Q170,40 190,80 Q210,120 180,160 Q150,200 170,240 Q190,280 160,320" stroke="#FFD700" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <path d="M180,0 Q140,50 160,100 Q180,150 150,200 Q120,250 140,300" stroke="#ff3cac" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <circle cx="200" cy="0" r="5" fill="#FFD700"/>
+    <circle cx="190" cy="80" r="4" fill="#ff3cac"/>
+    <circle cx="180" cy="160" r="5" fill="#FFD700"/>
+    <circle cx="170" cy="240" r="4" fill="#fff"/>
+    <!-- mini stars -->
+    <text x="155" y="30" font-size="14" fill="#FFD700">✦</text>
+    <text x="195" y="120" font-size="10" fill="#fff">✦</text>
+    <text x="140" y="200" font-size="14" fill="#ff3cac">✦</text>
+  </svg>
+
+  <svg class="serp" style="top:-10px;left:-10px;width:200px;height:300px;" viewBox="0 0 200 300">
+    <path d="M20,0 Q50,40 30,80 Q10,120 40,160 Q70,200 50,240 Q30,280 60,300" stroke="#00e5ff" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <path d="M40,0 Q80,50 60,100 Q40,150 70,200 Q100,250 80,300" stroke="#FFD700" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <circle cx="20" cy="0" r="5" fill="#00e5ff"/>
+    <circle cx="30" cy="80" r="4" fill="#FFD700"/>
+    <circle cx="40" cy="160" r="5" fill="#00e5ff"/>
+    <circle cx="50" cy="240" r="4" fill="#fff"/>
+    <text x="50" y="30" font-size="14" fill="#00e5ff">✦</text>
+    <text x="15" y="120" font-size="10" fill="#fff">✦</text>
+    <text x="70" y="200" font-size="14" fill="#FFD700">✦</text>
+  </svg>
+
+  <svg class="serp" style="bottom:0;left:20px;width:160px;height:200px;opacity:0.5;" viewBox="0 0 160 200">
+    <path d="M10,200 Q40,160 20,120 Q0,80 30,40 Q60,0 40,0" stroke="#ff3cac" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <circle cx="10" cy="200" r="5" fill="#ff3cac"/>
+    <text x="40" y="180" font-size="12" fill="#FFD700">✦</text>
+    <text x="20" y="100" font-size="10" fill="#fff">✦</text>
+  </svg>
+
+  <svg class="serp" style="bottom:0;right:20px;width:160px;height:200px;opacity:0.5;" viewBox="0 0 160 200">
+    <path d="M150,200 Q120,160 140,120 Q160,80 130,40 Q100,0 120,0" stroke="#00e5ff" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <circle cx="150" cy="200" r="5" fill="#00e5ff"/>
+    <text x="100" y="180" font-size="12" fill="#FFD700">✦</text>
+    <text x="130" y="100" font-size="10" fill="#fff">✦</text>
+  </svg>
+</div>
+
+<div id="confettiContainer"></div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- DIRECT TO WHEEL -->
+
+  <!-- WHEEL -->
+  <div class="screen active" id="screenWheel">
+    <div class="spin-title">
+      <h1>🎡 Tu Turno</h1>
+      <p id="spinSubtitle">¡Gira la ruleta y descubre tu premio!</p>
+      <span class="attempt-badge" id="attemptBadge"></span>
+    </div>
+    <div class="wheel-wrapper">
+      <div class="pointer"></div>
+      <canvas id="wheel" width="300" height="300"></canvas>
+      <div class="center-hub">⭐</div>
+    </div>
+    <button class="btn-spin" id="btnSpin" onclick="spin()">¡GIRAR!</button>
+  </div>
+
+  <!-- BLOCKED -->
+  <div class="screen" id="screenBlocked">
+    <div class="blocked-card">
+      <div class="emoji">🔒</div>
+      <h2>Ya participaste</h2>
+      <p>Este email ya fue usado en la ruleta. ¡Sigue practicando tu inglés y estate atento a nuestros próximos sorteos!</p>
+      <br>
+      <p style="color:#6a0080;font-weight:700;">🧡 El equipo de E4CC te desea mucho éxito.</p>
+    </div>
+  </div>
+
+</div>
+
+<!-- ADMIN -->
+<button class="admin-btn" onclick="toggleAdmin()">· · ·</button>
+<div class="admin-panel" id="adminPanel">
+  <h3>⚙️ Panel Administrador E4CC</h3>
+  <label>Nombre del Premio</label>
+  <input type="text" id="adminPrizeName" placeholder="Ej: Guía de 20 Secretos">
+  <label>Link de Descarga</label>
+  <input type="text" id="adminPrizeLink" placeholder="https://drive.google.com/...">
+  <label>Mensaje al Ganar</label>
+  <textarea id="adminWinMsg" rows="3"></textarea>
+  <br>
+  <button class="admin-save" onclick="saveAdmin()">💾 Guardar</button>
+  <button class="admin-reset" onclick="resetAllUsers()">🗑️ Limpiar usuarios</button>
+  <div class="admin-note">Los cambios se aplican de inmediato.</div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-emoji" id="modalEmoji"></div>
+    <div class="modal-title" id="modalTitle"></div>
+    <div class="modal-msg"   id="modalMsg"></div>
+    <div id="modalActions"></div>
+  </div>
+</div>
+
+<script>
+const DEFAULT_CONFIG = {
+  prizeName: "Guía: 20 Secretos para Mejorar tu Inglés",
+  prizeLink: "https://drive.google.com/uc?export=download&id=1fZRxNxB-wp16EckPDCDU2q45G_eXXQ_W",
+  winMsg: "¡Lo lograste! Tu dedicación merece este regalo. Descarga tu guía ahora y da el siguiente paso hacia tu carrera en inglés. 🧡"
+};
+function getConfig() {
+  try { const s=localStorage.getItem('e4cc_config'); return s?{...DEFAULT_CONFIG,...JSON.parse(s)}:DEFAULT_CONFIG; }
+  catch { return DEFAULT_CONFIG; }
+}
+
+// Wheel
+const SEGMENTS = [
+  {label:"🎁 PREMIO", win:true,  col1:"#c0006a", col2:"#e0008a"},
+  {label:"Gracias 🙏", win:false, col1:"#7a00b0", col2:"#9a00d0"},
+  {label:"🎁 PREMIO", win:true,  col1:"#c0006a", col2:"#e0008a"},
+  {label:"Gracias 🙏", win:false, col1:"#6a0090", col2:"#8a00b0"},
+  {label:"🎁 PREMIO", win:true,  col1:"#c0006a", col2:"#e0008a"},
+  {label:"Gracias 🙏", win:false, col1:"#7a00b0", col2:"#9a00d0"},
+];
+const N=SEGMENTS.length, ARC=(2*Math.PI)/N;
+const canvas=document.getElementById('wheel');
+const ctx=canvas.getContext('2d');
+const R=150;
+let currentAngle=0,spinning=false,attempt=1,userEmail='';
+
+function drawWheel(angle){
+  ctx.clearRect(0,0,300,300);
+  ctx.save(); ctx.translate(R,R); ctx.rotate(angle);
+  SEGMENTS.forEach((seg,i)=>{
+    const s=i*ARC, e=s+ARC;
+    // gradient slice
+    const grd=ctx.createRadialGradient(0,0,10,0,0,R-2);
+    grd.addColorStop(0,seg.col2); grd.addColorStop(1,seg.col1);
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.arc(0,0,R-2,s,e); ctx.closePath();
+    ctx.fillStyle=grd; ctx.fill();
+    // gold dividers
+    ctx.strokeStyle='#FFD700'; ctx.lineWidth=3; ctx.stroke();
+    // dots on rim
+    ctx.save(); ctx.rotate(s+ARC/2);
+    ctx.beginPath(); ctx.arc(R-10,0,5,0,2*Math.PI);
+    ctx.fillStyle='#FFD700'; ctx.fill();
+    ctx.restore();
+    // text
+    ctx.save(); ctx.rotate(s+ARC/2);
+    ctx.textAlign='right'; ctx.fillStyle='#fff';
+    ctx.font='bold 12px Segoe UI,Arial,sans-serif';
+    ctx.shadowColor='rgba(0,0,0,0.6)'; ctx.shadowBlur=4;
+    ctx.fillText(seg.label,R-22,5);
+    ctx.restore();
+  });
+  // outer gold ring
+  ctx.beginPath(); ctx.arc(0,0,R-2,0,2*Math.PI);
+  ctx.strokeStyle='#FFD700'; ctx.lineWidth=5; ctx.stroke();
+  ctx.restore();
+}
+drawWheel(0);
+
+function startGame(){
+  const val=document.getElementById('emailInput').value.trim().toLowerCase();
+  const err=document.getElementById('emailError');
+  if(!val||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)){err.style.display='block';return;}
+  err.style.display='none';
+  userEmail=val; show('screenWheel');
+}
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function getTargetAngle(wantWin){
+  const cands=SEGMENTS.map((s,i)=>({s,i})).filter(({s})=>s.win===wantWin);
+  const pick=cands[Math.floor(Math.random()*cands.length)];
+  const segMid=pick.i*ARC+ARC/2;
+  const target=-segMid-Math.PI/2;
+  return target+(5+Math.floor(Math.random()*4))*Math.PI*2;
+}
+
+function spin(){
+  if(spinning)return;
+  spinning=true;
+  document.getElementById('btnSpin').disabled=true;
+  const wantWin=attempt===2;
+  const start=currentAngle;
+  const end=start+(getTargetAngle(wantWin)-( start%(2*Math.PI))+(2*Math.PI)*6);
+  const dur=4500+Math.random()*600;
+  const t0=performance.now();
+  function ease(t){return 1-Math.pow(1-t,4);}
+  function frame(now){
+    const t=Math.min((now-t0)/dur,1);
+    currentAngle=start+(end-start)*ease(t);
+    drawWheel(currentAngle);
+    if(t<1){requestAnimationFrame(frame);}
+    else{currentAngle=end;drawWheel(end);spinning=false;setTimeout(()=>showResult(wantWin),650);}
+  }
+  requestAnimationFrame(frame);
+}
+
+function showResult(won){
+  const cfg=getConfig();
+  if(!won){
+    document.getElementById('modalEmoji').textContent='🧡';
+    document.getElementById('modalTitle').textContent='¡Casi lo logras!';
+    document.getElementById('modalMsg').innerHTML='No todos llegaron al éxito en el primer intento — pero los que sí triunfaron <strong>no se rindieron.</strong> ¡Esta es tu segunda oportunidad, aprovéchala!';
+    document.getElementById('modalActions').innerHTML=`<button class="btn-main" onclick="closeModal();nextAttempt()">¡LO INTENTO DE NUEVO! 💪</button>`;
+    attempt=2;
+    document.getElementById('attemptBadge').textContent='';
+    document.getElementById('spinSubtitle').textContent='¡Esta es tu segunda oportunidad!';
+  } else {
+    document.getElementById('modalEmoji').textContent='🏆';
+    document.getElementById('modalTitle').textContent='¡GANASTE! 🎉';
+    document.getElementById('modalMsg').innerHTML=`<strong>${cfg.prizeName}</strong><br><br>${cfg.winMsg}`;
+    document.getElementById('modalActions').innerHTML=`<a href="${cfg.prizeLink}" class="btn-claim" target="_blank">🎁 RECLAMAR PREMIO</a><div class="confetti-note">¡Descarga gratuita para ti! 💙</div>`;
+    launchConfetti();
+    localStorage.setItem('e4cc_played_'+userEmail,'1');
+  }
+  document.getElementById('modalOverlay').classList.add('show');
+}
+function closeModal(){document.getElementById('modalOverlay').classList.remove('show');}
+function nextAttempt(){document.getElementById('btnSpin').disabled=false;}
+
+function launchConfetti(){
+  const colors=['#ff3cac','#FFD700','#9b00d3','#00e5ff','#ff6600','#fff','#00cc44'];
+  const c=document.getElementById('confettiContainer');
+  for(let i=0;i<100;i++){
+    setTimeout(()=>{
+      const el=document.createElement('div');
+      el.className='confetti-piece';
+      el.style.cssText=`left:${Math.random()*100}vw;background:${colors[Math.floor(Math.random()*colors.length)]};width:${8+Math.random()*8}px;height:${8+Math.random()*8}px;border-radius:${Math.random()>.5?'50%':'2px'};animation-duration:${2.5+Math.random()*2}s;`;
+      c.appendChild(el);
+      setTimeout(()=>el.remove(),5000);
+    },i*20);
+  }
+}
+
+let adminClicks=0,adminTimer;
+function toggleAdmin(){
+  adminClicks++;
+  clearTimeout(adminTimer);
+  adminTimer=setTimeout(()=>adminClicks=0,2000);
+  if(adminClicks>=5){
+    adminClicks=0;
+    const p=document.getElementById('adminPanel');
+    if(p.style.display==='block'){p.style.display='none';return;}
+    const cfg=getConfig();
+    document.getElementById('adminPrizeName').value=cfg.prizeName;
+    document.getElementById('adminPrizeLink').value=cfg.prizeLink;
+    document.getElementById('adminWinMsg').value=cfg.winMsg;
+    p.style.display='block';
+  }
+}
+function saveAdmin(){
+  localStorage.setItem('e4cc_config',JSON.stringify({
+    prizeName:document.getElementById('adminPrizeName').value,
+    prizeLink:document.getElementById('adminPrizeLink').value,
+    winMsg:document.getElementById('adminWinMsg').value,
+  }));
+  alert('✅ Cambios guardados.');
+}
+function resetAllUsers(){
+  if(!confirm('¿Limpiar todos los registros?'))return;
+  Object.keys(localStorage).filter(k=>k.startsWith('e4cc_played_')).forEach(k=>localStorage.removeItem(k));
+  alert('✅ Registros limpiados.');
+}
+
+</script>
+</body>
+</html>
